@@ -49,12 +49,22 @@ class tile(pygame.sprite.Sprite):
         self.wall_right_x=19
         #(14, 24)
         self.wall_under_y=24
+
+        #hold
         self.hold=0
         self.hold_tile=""
+        self.hold_number=0
+        self.hold_x=3
+        self.hold_y=7
 
 
-    def drop_new(self):
-        self.hold=0
+    def drop_new(self,hold=0,gravity=0):
+
+        if gravity==1 and self.Y<=2:
+            print("GAMEOVER")
+            sys.exit()
+
+        self.hold=hold
         self.block_number=randint(2,len(block_categories)-1)
         self.block=block_categories[self.block_number]
         self.style=0
@@ -64,6 +74,47 @@ class tile(pygame.sprite.Sprite):
         self.Tile=dote(self.block)
         self.draw(self.X,self.Y)
 
+    def return_tile(self):
+        
+        self.del_tile(self.Tile[self.style])
+
+        if self.hold_tile!="":
+
+            last_tile=dote(TILE.hold_tile)[0]
+            #print(last_tile)
+            for i in range(len(last_tile)):
+                for g in range(len(last_tile[i])):
+                    #print(i,g)
+                    if last_tile[i][g]!=0:
+                        #print("#",i,g,TILE.hold_y+i,TILE.hold_x+g)
+                        map_Tile[TILE.hold_y+i][TILE.hold_x+g]=0
+
+
+            self.hold_tile,self.block = self.block,self.hold_tile
+            self.block_number,self.hold_number = self.hold_number,self.block_number
+            self.style=0
+
+             #(12, 2)
+            self.X=12
+            self.Y=2
+            self.Tile=dote(self.block)
+            self.draw(self.X,self.Y)
+            self.hold=1
+
+        
+        else:
+
+            self.hold_tile = self.block
+            self.hold_number = self.block_number
+
+            self.drop_new(hold=1)
+
+        Tile=dote(self.hold_tile)[0]
+        #print(Tile)
+        for i in range(len(Tile)):
+            for g in range(len(Tile[i])):
+                if Tile[i][g]!=0:
+                    map_Tile[self.hold_y+i][self.hold_x+g]=self.hold_number
 
 
     def draw(self,X,Y):
@@ -74,7 +125,7 @@ class tile(pygame.sprite.Sprite):
                 if Tile[i][g]!=0:
                     map_Tile[Y+i][X+g]=self.block_number
 
-    
+
     def check(self,Tile,dx,dy):
         #map_Tile[self.Y+i][self.X+g]
         for i in range(len(Tile)):
@@ -84,12 +135,25 @@ class tile(pygame.sprite.Sprite):
                     return 0
         return 1
     
+    def gravity_check(self,Tile,dx,dy):
+        self.del_tile(Tile)
+        #map_Tile[self.Y+i][self.X+g]
+        for i in range(len(Tile)):
+            for g in range(len(Tile[i])):
+                #print("#",self.Y+i+1,self.X+g)
+                if Tile[i][g]!=0 and map_Tile[self.Y+i+dy][self.X+g+dx]!=0:
+                    self.draw(self.X,self.Y)
+                    return 0
+                
+        self.draw(self.X,self.Y)
+        return 1
+    
     def del_tile(self,Tile):
         for i in range(len(Tile)):
             for g in range(len(Tile[i])):
                 if Tile[i][g]!=0:
                     map_Tile[self.Y+i][self.X+g]=0
-                    
+    
 
     def move_tile(self,direction):
 
@@ -177,8 +241,10 @@ class map(pygame.sprite.Sprite):
         map_Tile[POS[1]][POS[0]]=0
 
 
-
+###############
 develop=0
+###############
+
 MAP=map(35)
 TILE=tile(35)
 
@@ -190,7 +256,7 @@ delay={
     "k_left":[last_time,0.1],
     "k_right":[last_time,0.1],
 }
-contact_floor=[0,0.5,last_time]
+contact_floor=[0,1.5,last_time]
 hold=0
 
 for i in range(MAP.block_size[1]+2):
@@ -219,7 +285,7 @@ while 1:
     if contact_floor[0]==1 and time.time()-contact_floor[2]>=contact_floor[1]:
         contact_floor[0]=0
         
-        TILE.drop_new()
+        TILE.drop_new(gravity=1)
 
     if keys[pygame.K_DOWN]:
         if time.time()-delay["k_down"][0]>=delay["k_down"][1]:
@@ -229,6 +295,9 @@ while 1:
                 if contact_floor[0]==0:
                     contact_floor[0]=1
                     contact_floor[2]=time.time()
+
+            else:
+                contact_floor[0]=0
             
 
     if keys[pygame.K_LEFT]:
@@ -242,9 +311,13 @@ while 1:
             delay["k_right"][0]=time.time()
 
     if keys[pygame.K_c] and TILE.hold==0:
-        TILE.hold=1
-        TILE.hold_tile=TILE.block
-        print("##")
+
+        TILE.return_tile()
+
+        
+        #print("##")
+        #(2,6)->(3,7)##
+        #(7,9)->(6,8)
         #print()
 
     for EVENT in pygame.event.get():
@@ -263,17 +336,18 @@ while 1:
 
 
 
+    if TILE.gravity_check(TILE.Tile[TILE.style],TILE.dx[2],TILE.dy[2])==1:
 
-    if time.time()-delay["down"][0]>=delay["down"][1]:#1.1:
-        delay["down"][0]=time.time()
-        ANS=TILE.move_tile("down")
-        if ANS==0:
-            if contact_floor[0]==0:
-                contact_floor[0]=1
-                contact_floor[2]=time.time()
+        contact_floor[0]=0
+        contact_floor[2]=time.time()
+        #print("XCCCV")
+        if time.time()-delay["down"][0]>=delay["down"][1]:#1.1:
+            TILE.move_tile("down")
+            delay["down"][0]=time.time()
 
-
-
+    else:
+         if contact_floor[0]==0:
+            contact_floor[0]=1
 
 
 
